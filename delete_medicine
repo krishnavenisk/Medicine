@@ -1,0 +1,187 @@
+from tkinter import *
+from tkinter import ttk
+import sqlite3
+import tkinter.messagebox as msg
+
+# ------------------ MAIN WINDOW ------------------
+window = Tk()
+window.geometry("900x600")
+window.title("Medical Management System - Delete Medicine")
+
+# ------------------ BACKGROUND IMAGE ------------------
+reg_image = PhotoImage(file="medd.png")
+bg_label = Label(window, image=reg_image)
+bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+# ------------------ TOP HEADING ------------------
+TopHeadingFrame = Frame(window, bg="white")
+TopHeadingFrame.pack(pady=20)
+
+Label(
+    TopHeadingFrame,
+    text="Medical Management System - Delete Medicine",
+    font=("Arial", 20, "bold"),
+    fg="red",
+    bg="white"
+).pack()
+
+# ------------------ SEARCH FRAME ------------------
+SearchFrame = Frame(window, bg="white")
+SearchFrame.pack(pady=10)
+
+Label(
+    SearchFrame,
+    text="Medicine Name:",
+    font=("Arial", 14),
+    bg="white"
+).grid(row=0, column=0, padx=10)
+
+search_var = StringVar()
+Entry(
+    SearchFrame,
+    textvariable=search_var,
+    font=("Arial", 14),
+    width=25
+).grid(row=0, column=1, padx=10)
+
+Button(
+    SearchFrame,
+    text="Search",
+    font=("Arial", 14, "bold"),
+    bg="blue",
+    fg="white",
+    width=10,
+    command=lambda: search_medicine()
+).grid(row=0, column=2, padx=10)
+
+Button(
+    SearchFrame,
+    text="Show All",
+    font=("Arial", 14, "bold"),
+    bg="gray",
+    fg="white",
+    width=10,
+    command=lambda: load_data()
+).grid(row=0, column=3, padx=10)
+
+# ------------------ TREEVIEW ------------------
+view_frame = Frame(window, bg="white")
+view_frame.pack(fill=BOTH, expand=True, pady=10)
+
+tv = ttk.Treeview(
+    view_frame,
+    columns=(
+        'MedicineID',
+        'MedicineName',
+        'Brand',
+        'ChemicalComponent',
+        'MFG_Date',
+        'EXP_Date',
+        'Price'
+    ),
+    show='headings'
+)
+
+for col in tv["columns"]:
+    tv.heading(col, text=col.replace("_", " "))
+    tv.column(col, width=120)
+
+tv.pack(fill=BOTH, expand=True)
+
+# ------------------ DATABASE ------------------
+conn = sqlite3.connect('medicine.db')
+cursor = conn.cursor()
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS medicine (
+        MedicineID TEXT PRIMARY KEY,
+        MedicineName TEXT,
+        Brand TEXT,
+        ChemicalComponent TEXT,
+        MFG_Date TEXT,
+        EXP_Date TEXT,
+        Price TEXT
+    )
+""")
+conn.commit()
+
+# ------------------ LOAD ALL DATA ------------------
+def load_data():
+    tv.delete(*tv.get_children())
+    cursor.execute("SELECT * FROM medicine")
+    for row in cursor.fetchall():
+        tv.insert('', END, values=row)
+
+# ------------------ SEARCH FUNCTION ------------------
+def search_medicine():
+    name = search_var.get().strip()
+    tv.delete(*tv.get_children())
+
+    cursor.execute(
+        "SELECT * FROM medicine WHERE MedicineName LIKE ?",
+        ('%' + name + '%',)
+    )
+
+    for row in cursor.fetchall():
+        tv.insert('', END, values=row)
+
+# ------------------ DELETE FUNCTION ------------------
+def delete_medicine():
+    selected = tv.selection()
+
+    if not selected:
+        msg.showwarning("Warning", "Please select a medicine to delete")
+        return
+
+    values = tv.item(selected[0], "values")
+    medicine_id = values[0]
+
+    confirm = msg.askyesno(
+        "Confirm Delete",
+        f"Are you sure you want to delete:\n\n{values[1]} ?"
+    )
+
+    if confirm:
+        cursor.execute(
+            "DELETE FROM medicine WHERE MedicineID = ?",
+            (medicine_id,)
+        )
+        conn.commit()
+        tv.delete(selected[0])
+        msg.showinfo("Success", "Medicine deleted successfully")
+
+# ------------------ BACK FUNCTION ------------------
+def back():
+    window.destroy()
+    import home   # Uncomment if you have home.py
+
+# ------------------ BUTTONS ------------------
+btn_frame = Frame(window, bg="white")
+btn_frame.pack(pady=10)
+
+Button(
+    btn_frame,
+    text="Delete Selected",
+    font=("Arial", 16, "bold"),
+    bg="red",
+    fg="white",
+    width=15,
+    command=delete_medicine
+).grid(row=0, column=0, padx=10)
+
+Button(
+    btn_frame,
+    text="Back",
+    font=("Arial", 16, "bold"),
+    bg="green",
+    fg="white",
+    width=15,
+    command=back
+).grid(row=0, column=1, padx=10)
+
+# ------------------ LOAD DATA AT START ------------------
+load_data()
+
+# ------------------ MAIN LOOP ------------------
+window.mainloop()
+conn.close()
